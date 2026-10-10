@@ -98,11 +98,11 @@ Built for **Smart India Hackathon 2026** — Problem Statement 26180 (Agricultur
 
 ## Prototype Images
 
-![Prototype Image 1](SIH_1.jpeg)
-
-![Prototype Image 2](SIH_2.jpeg)
-
-![Prototype Image 3](SIH_3.jpeg)
+<p align="center">
+  <img src="SIH_1.jpeg" width="32%" alt="Prototype Image 1">
+  <img src="SIH_2.jpeg" width="32%" alt="Prototype Image 2">
+  <img src="SIH_3.jpeg" width="32%" alt="Prototype Image 3">
+</p>
 
 ---
 
