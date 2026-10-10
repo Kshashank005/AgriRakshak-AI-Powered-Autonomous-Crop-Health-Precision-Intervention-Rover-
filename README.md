@@ -96,6 +96,16 @@ Built for **Smart India Hackathon 2026** — Problem Statement 26180 (Agricultur
 
 ---
 
+## Prototype Images
+
+![Prototype Image 1](SIH_1.jpeg)
+
+![Prototype Image 2](SIH_2.jpeg)
+
+![Prototype Image 3](SIH_3.jpeg)
+
+---
+
 ## 🧠 Challenges & Engineering Strategies
 
 | Challenge | Strategy |
