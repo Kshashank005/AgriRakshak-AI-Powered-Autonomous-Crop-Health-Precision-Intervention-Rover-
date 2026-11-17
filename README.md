@@ -210,8 +210,8 @@ Before field trials, the rover's navigation, detection, and spraying logic were 
 - **Dashboard:** Field map with spray outcomes, soil moisture heatmap with irrigation zones, tank level, state timeline, pesticide usage vs blanket baseline, detector confusion matrix, and KPIs.
 
 <p align="center">
-  <img src="sih_ar_1.png" width="48%" alt="MATLAB simulation: live field view">
-  <img src="sih_ar_2.png" width="48%" alt="MATLAB simulation: mission dashboard">
+  <img src="sih_ar_11.png" width="48%" alt="MATLAB simulation: live field view">
+  <img src="sih_ar_22.png" width="48%" alt="MATLAB simulation: mission dashboard">
 </p>
 
 **Detector model in the simulation.** The simulation has no leaf images, so the convolutional backbone is replaced by a scalar disease evidence $s$ for each plant in a frame, and the output layer is kept as in the real network (38-class softmax, argmax, confidence):
@@ -240,8 +240,6 @@ Here $n_{\mathrm{plant}}$ is fixed per plant (how it looks), $n_{\mathrm{frame}}
 | Pesticide used | 1.43 L vs 11.04 L blanket spraying (~87% saved) |
 | Mission time | ~16 min for the full field |
 | Across 20 random fields | Recall 0.89 ± 0.04, precision 0.88 ± 0.04, pesticide saved 86.6 ± 1.4% |
-
-**Run it:** open the `agrirakshak` folder in MATLAB and run `main_agrirakshak` (or `main_agrirakshak(true)` to include the multi-seed experiments).
 
 ---
 
