@@ -85,6 +85,98 @@ Built for **Smart India Hackathon 2026** — Problem Statement 26180 (Agricultur
 
 ---
 
+## 🧮 MobileNetV2 Model: Mathematical Formulation
+
+The disease classifier maps a leaf image to one of $C = 38$ classes. MobileNetV2 is built from two ideas, depthwise separable convolutions and inverted residual blocks with linear bottlenecks, which keep it small enough to run on the Raspberry Pi 5.
+
+**1. Preprocessing.** Each camera frame is cropped, resized to $224 \times 224$, scaled to $[0,1]$, and normalized per colour channel $c$ with the training-set mean $\mu_c$ and standard deviation $\sigma_c$:
+
+```math
+\hat{x}_{c}(i,j) = \frac{x_{c}(i,j)/255 - \mu_c}{\sigma_c}
+```
+
+**2. Depthwise separable convolution.** A standard $k \times k$ convolution mixes space and channels in one step. MobileNetV2 splits it into a depthwise step (one $k \times k$ filter per channel) followed by a pointwise step (a $1 \times 1$ convolution that mixes channels):
+
+```math
+\text{depthwise:}\quad G_m(i,j) = \sum_{u=1}^{k}\sum_{v=1}^{k} K_m(u,v)\, F_m(i+u,\, j+v)
+```
+
+```math
+\text{pointwise:}\quad O_n(i,j) = \sum_{m=1}^{d_i} W_{n,m}\, G_m(i,j)
+```
+
+For a feature map of size $h \times w$ with $d_i$ input and $d_j$ output channels, the cost in multiply-adds drops from
+
+```math
+h \cdot w \cdot d_i \cdot d_j \cdot k^2 \quad\longrightarrow\quad h \cdot w \cdot d_i\,(k^2 + d_j)
+```
+
+which is a reduction of roughly $k^2$ (about 8 to 9 times for $k = 3$).
+
+**3. Inverted residual block with linear bottleneck.** Each block expands a thin input $x$ by a factor $t$ (here $t = 6$), filters it with a depthwise convolution, then projects it back to a thin output with no activation on the last step:
+
+```math
+\begin{aligned}
+z_1 &= \mathrm{ReLU6}\big(\mathrm{BN}(W_{\mathrm{expand}} * x)\big) && 1 \times 1 \text{ conv, } d \rightarrow t\,d \text{ channels}\\
+z_2 &= \mathrm{ReLU6}\big(\mathrm{BN}(W_{\mathrm{dw}} \circledast z_1)\big) && 3 \times 3 \text{ depthwise, stride } s\\
+F(x) &= \mathrm{BN}(W_{\mathrm{project}} * z_2) && 1 \times 1 \text{ conv, linear, } t\,d \rightarrow d' \text{ channels}
+\end{aligned}
+```
+
+```math
+y = \begin{cases} x + F(x), & s = 1 \text{ and } d = d' \\ F(x), & \text{otherwise} \end{cases}
+```
+
+The activation is $\mathrm{ReLU6}(a) = \min(\max(a, 0),\, 6)$, which stays well behaved under low-precision arithmetic. The projection is kept linear because a ReLU applied in a low-dimensional space destroys information. Batch normalization is
+
+```math
+\mathrm{BN}(a) = \gamma\,\frac{a - \mu_B}{\sqrt{\sigma_B^2 + \epsilon}} + \beta
+```
+
+**4. Network.** A $3 \times 3$ stem convolution (32 channels) is followed by 17 inverted residual blocks, a $1 \times 1$ convolution to 1280 channels, and global average pooling, giving a feature vector $f \in \mathbb{R}^{1280}$:
+
+```math
+f_n = \frac{1}{h\,w}\sum_{i=1}^{h}\sum_{j=1}^{w} O_n(i,j)
+```
+
+| Expansion $t$ | Output channels | Blocks | Stride |
+|---|---|---|---|
+| 1 | 16 | 1 | 1 |
+| 6 | 24 | 2 | 2 |
+| 6 | 32 | 3 | 2 |
+| 6 | 64 | 4 | 2 |
+| 6 | 96 | 3 | 1 |
+| 6 | 160 | 3 | 2 |
+| 6 | 320 | 1 | 1 |
+
+**5. Classification.** A fully connected layer and softmax turn $f$ into class probabilities:
+
+```math
+z = W f + b, \qquad p_c = \frac{e^{z_c}}{\sum_{k=1}^{C} e^{z_k}}, \qquad c = 1, \dots, 38
+```
+
+With a 38-class head the network has about 2.3 million parameters.
+
+**6. Training loss.** The model is trained by minimizing the cross-entropy between the predicted probabilities and the one-hot labels $y$ over a batch of $N$ images:
+
+```math
+\mathcal{L} = -\frac{1}{N}\sum_{n=1}^{N}\sum_{c=1}^{C} y_{n,c}\,\log p_{n,c}
+```
+
+**7. Decision rule on the rover.** The predicted class and its confidence are
+
+```math
+\hat{y} = \arg\max_{c}\; p_c, \qquad \mathrm{conf} = \max_{c}\; p_c
+```
+
+and the rover acts on them with a confidence threshold $\tau$:
+
+```math
+\text{action} = \begin{cases} \text{spray plant}, & \hat{y} \text{ is a disease class and } \mathrm{conf} \ge \tau \\ \text{flag for farmer review}, & \mathrm{conf} < \tau \\ \text{continue scanning}, & \hat{y} \text{ is healthy and } \mathrm{conf} \ge \tau \end{cases}
+```
+
+---
+
 ## 🧪 Prototype Workflow
 
 1. Rover autonomously navigates the field using depth-camera-based obstacle avoidance →
@@ -112,7 +204,7 @@ Before field trials, the rover's navigation, detection, and spraying logic were 
 
 **What it simulates:**
 - **Rover motion:** Differential-drive kinematics with process noise, pure-pursuit row following, headland U-turns in a boustrophedon pattern, and obstacle sidestepping.
-- **Perception:** Left/right side-camera footprints with a confusion-matrix detector model (true/false positive rates, confidence scores, processing latency) and a depth camera for row centering and obstacle flags. A plant must be flagged in 2 consecutive frames before the rover acts.
+- **Perception:** Left/right side-camera footprints with a mathematical surrogate of the MobileNetV2 classifier (below), processing latency, and a depth camera for row centering and obstacle flags. A plant must be flagged in 2 consecutive frames with confidence above 0.6 before the rover acts.
 - **Decision logic:** A 10-state finite state machine (scan → confirm → align → spray → resume, plus row turn, refill, and obstacle avoidance) with timeouts in every state.
 - **Sprayer:** Tank, pump, and severity-scaled dosing, with an automatic refill trip at 10% tank level, compared against a blanket-spraying baseline.
 - **Dashboard:** Field map with spray outcomes, soil moisture heatmap with irrigation zones, tank level, state timeline, pesticide usage vs blanket baseline, detector confusion matrix, and KPIs.
@@ -122,17 +214,34 @@ Before field trials, the rover's navigation, detection, and spraying logic were 
   <img src="sih_ar_2.png" width="48%" alt="MATLAB simulation: mission dashboard">
 </p>
 
-**Simulated results** *(default run, seed 42; detector modelled statistically, not the trained MobileNetV2)*:
+**Detector model in the simulation.** The simulation has no leaf images, so the convolutional backbone is replaced by a scalar disease evidence $s$ for each plant in a frame, and the output layer is kept as in the real network (38-class softmax, argmax, confidence):
+
+```math
+s = \mu + \sigma\left(\sqrt{\rho}\; n_{\mathrm{plant}} + \sqrt{1-\rho}\; n_{\mathrm{frame}}\right), \qquad n_{\mathrm{plant}},\, n_{\mathrm{frame}} \sim \mathcal{N}(0,1)
+```
+
+```math
+\mu_{\mathrm{diseased}} = \sigma\,\Phi^{-1}(\mathrm{TPR}), \qquad \mu_{\mathrm{healthy}} = \sigma\,\Phi^{-1}(\mathrm{FPR})
+```
+
+```math
+z_{\mathrm{healthy}} = -\tfrac{\kappa s}{2}, \quad z_{\mathrm{disease}} = +\tfrac{\kappa s}{2}, \qquad p_c = \frac{e^{z_c}}{\sum_{k=1}^{38} e^{z_k}}, \qquad \hat{y} = \arg\max_c\, p_c, \quad \mathrm{conf} = \max_c\, p_c
+```
+
+Here $n_{\mathrm{plant}}$ is fixed per plant (how it looks), $n_{\mathrm{frame}}$ changes every frame, and $\rho = 0.8$ sets how alike two frames of the same plant are. The means are chosen so the per-frame true and false positive rates equal the set values (0.92 and 0.05). Confidence comes out of the softmax, so frames near the decision boundary, where errors happen, are the low-confidence ones.
+
+**Simulated results** *(default run, seed 42; surrogate detector, not the trained MobileNetV2)*:
 
 | Metric | Value |
 |---|---|
 | Plants scanned | 552 of 552 |
-| Detection precision / recall | 0.98 / 0.97 |
-| Diseased plants sprayed | 63 of 65 |
-| Pesticide used | 1.48 L vs 11.04 L blanket spraying (~87% saved) |
-| Mission time | ~15 min for the full field |
-| Across 20 random fields | Recall 0.93 ± 0.03, precision 0.94 ± 0.03, pesticide saved 86.8 ± 1.4% |
+| Detection precision / recall | 0.89 / 0.88 |
+| Diseased plants sprayed | 57 of 65 |
+| Pesticide used | 1.43 L vs 11.04 L blanket spraying (~87% saved) |
+| Mission time | ~16 min for the full field |
+| Across 20 random fields | Recall 0.89 ± 0.04, precision 0.88 ± 0.04, pesticide saved 86.6 ± 1.4% |
 
+**Run it:** open the `agrirakshak` folder in MATLAB and run `main_agrirakshak` (or `main_agrirakshak(true)` to include the multi-seed experiments).
 
 ---
 
