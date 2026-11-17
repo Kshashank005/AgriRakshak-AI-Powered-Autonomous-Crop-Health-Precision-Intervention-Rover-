@@ -106,6 +106,37 @@ Built for **Smart India Hackathon 2026** — Problem Statement 26180 (Agricultur
 
 ---
 
+## 🖥️ MATLAB Simulation
+
+Before field trials, the rover's navigation, detection, and spraying logic were validated in a 2D MATLAB simulation (base MATLAB only, no toolboxes). The simulation models a 40 m × 25 m field with 8 crop rows and 552 plants, spatially clustered disease hotspots, and a soil moisture map with dry patches.
+
+**What it simulates:**
+- **Rover motion:** Differential-drive kinematics with process noise, pure-pursuit row following, headland U-turns in a boustrophedon pattern, and obstacle sidestepping.
+- **Perception:** Left/right side-camera footprints with a confusion-matrix detector model (true/false positive rates, confidence scores, processing latency) and a depth camera for row centering and obstacle flags. A plant must be flagged in 2 consecutive frames before the rover acts.
+- **Decision logic:** A 10-state finite state machine (scan → confirm → align → spray → resume, plus row turn, refill, and obstacle avoidance) with timeouts in every state.
+- **Sprayer:** Tank, pump, and severity-scaled dosing, with an automatic refill trip at 10% tank level, compared against a blanket-spraying baseline.
+- **Dashboard:** Field map with spray outcomes, soil moisture heatmap with irrigation zones, tank level, state timeline, pesticide usage vs blanket baseline, detector confusion matrix, and KPIs.
+
+<p align="center">
+  <img src="sih_ar_1.png" width="48%" alt="MATLAB simulation: live field view">
+  <img src="sih_ar_2.png" width="48%" alt="MATLAB simulation: mission dashboard">
+</p>
+
+**Simulated results** *(default run, seed 42; detector modelled statistically, not the trained MobileNetV2)*:
+
+| Metric | Value |
+|---|---|
+| Plants scanned | 552 of 552 |
+| Detection precision / recall | 0.98 / 0.97 |
+| Diseased plants sprayed | 63 of 65 |
+| Pesticide used | 1.48 L vs 11.04 L blanket spraying (~87% saved) |
+| Mission time | ~15 min for the full field |
+| Across 20 random fields | Recall 0.93 ± 0.03, precision 0.94 ± 0.03, pesticide saved 86.8 ± 1.4% |
+
+**Run it:** open the `agrirakshak` folder in MATLAB and run `main_agrirakshak` (or `main_agrirakshak(true)` to include the multi-seed experiments).
+
+---
+
 ## 🧠 Challenges & Engineering Strategies
 
 | Challenge | Strategy |
