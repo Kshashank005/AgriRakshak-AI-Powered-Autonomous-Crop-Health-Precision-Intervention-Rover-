@@ -133,7 +133,6 @@ Before field trials, the rover's navigation, detection, and spraying logic were 
 | Mission time | ~15 min for the full field |
 | Across 20 random fields | Recall 0.93 ± 0.03, precision 0.94 ± 0.03, pesticide saved 86.8 ± 1.4% |
 
-**Run it:** open the `agrirakshak` folder in MATLAB and run `main_agrirakshak` (or `main_agrirakshak(true)` to include the multi-seed experiments).
 
 ---
 
